@@ -1,3 +1,40 @@
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+
+[tool.poetry]
+description = "dense SLAM system presented in Gaussian Splatting SLAM</a> in CVPR'24."
+name = "Gaussian Splatting SLAM"
+version = "0.1.0"
+authors = ["Hidenobu Matsuki"]
+
+
+[tool.poetry.dependencies]
+python = "~3.9"
+torch = "^2.4.0"
+torchmetrics = "^1.4.1"
+torchvision = "*"
+torchaudio = "*"
+opencv-python = "^4.8.1.78"
+munch = "^4.0.0"
+trimesh = "^4.4.7"
+evo = "^1.11.0"
+open3d = "^0.18.0"
+imgviz = "^1.7.5"
+PyOpenGL = "^3.1.7"
+glfw = "^2.7.0"
+PyGLM = "^2.7.1"
+wandb = "^0.17.8"
+lpips = "^0.1.4"
+rich = "^13.8.0"
+plyfile = "^1.0.3"
+
+simple-knn = { path = "submodules/simple-knn", develop = true }
+diff-gaussian-rasterization = { path = "submodules/diff-gaussian-rasterization", develop = true }
+
+[tool.poetry.dev-dependencies]
+ruff = "^0.6.2"
+
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
