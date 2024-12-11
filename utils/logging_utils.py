@@ -1,4 +1,6 @@
 import rich
+from accelerate import Accelerator
+from accelerate.logging import get_logger
 
 _log_styles = {
     "MonoGS": "bold green",
@@ -15,4 +17,7 @@ def get_style(tag):
 
 def Log(*args, tag="MonoGS"):
     style = get_style(tag)
-    rich.print(f"[{style}]{tag}:[/{style}]", *args)
+    # rich.print(f"[{style}]{tag}:[/{style}]", *args)
+
+    logger = get_logger(tag)
+    logger.info(" ".join(map(str, args)))
