@@ -1,0 +1,15 @@
+inherit_from: configs/mi/mi_rgbd.yaml
+data:
+  input_path: datasets/Mi_Dataset/adr::dataclip:prod.MS11-5.LNBQ9MDGKJZ8Y8T51::1719368061231471708:1719368101453931585
+  output_path: output/Mi_Dataset/A1/
+  scene_name: A1
+cam:
+  #intrinsic is different per scene in TUM
+  H: 2160
+  W: 3840
+  fx: 1904.9478759765625
+  fy: 1903.8414306640625
+  cx: 1920.1502685546875
+  cy: 1077.5078125
+  crop_edge: 50
+  distortion: [ -0.029948318377137184, -0.00594981899484992, 0.000629439193289727, 0.00042217347072437406 ]

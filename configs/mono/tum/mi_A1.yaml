@@ -1,0 +1,19 @@
+inherit_from: "configs/mono/tum/base_config.yaml"
+
+Dataset:
+  dataset_path: "datasets/Mi_Dataset/adr::dataclip:prod.MS11-5.LNBQ9MDGKJZ8Y8T51::1719368061231471708:1719368101453931585"
+  Calibration:
+    fx: 1904.9478759765625
+    fy: 1903.8414306640625
+    cx: 1920.1502685546875
+    cy: 1077.5078125
+    k1: -0.029948318377137184
+    k2: -0.00594981899484992
+    p1: 0.0
+    p2: 0.0
+    k3: 0.0
+    width: 3840
+    height: 2160
+    distorted: True
+
+
