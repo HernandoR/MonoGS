@@ -29,6 +29,47 @@ class backend_sync_msg:
 
 
 class FrontEnd(mp.Process):
+    """
+    FrontEnd is a multiprocessing process that handles the front-end operations of a SLAM (Simultaneous Localization and Mapping) system. It manages the initialization, tracking, and keyframe management of the SLAM pipeline.
+
+    Attributes:
+        config (dict): Configuration parameters for the SLAM system.
+        background (NoneType): Placeholder for background data.
+        pipeline_params (NoneType): Placeholder for pipeline parameters.
+        frontend_queue (NoneType): Queue for communication from frontend to backend.
+        backend_queue (NoneType): Queue for communication from backend to frontend.
+        q_main2vis (NoneType): Queue for communication from main to visualization.
+        q_vis2main (NoneType): Queue for communication from visualization to main.
+        initialized (bool): Flag indicating if the system is initialized.
+        kf_indices (list): List of keyframe indices.
+        monocular (bool): Flag indicating if the system is monocular.
+        iteration_count (int): Counter for iterations.
+        occ_aware_visibility (dict): Dictionary for occlusion-aware visibility.
+        current_window (list): List of current window frames.
+        reset (bool): Flag indicating if the system needs to reset.
+        requested_init (bool): Flag indicating if initialization is requested.
+        requested_keyframe (int): Counter for requested keyframes.
+        use_every_n_frames (int): Parameter for using every n-th frame.
+        gaussians (NoneType): Placeholder for Gaussian data.
+        cameras (dict): Dictionary of camera viewpoints.
+        device (str): Device to be used for computation (e.g., "cuda:0").
+        pause (bool): Flag indicating if the system is paused.
+
+    Methods:
+        set_hyperparams(): Sets the hyperparameters from the configuration.
+        add_new_keyframe(cur_frame_idx, depth=None, opacity=None, init=False): Adds a new keyframe to the system.
+        initialize(cur_frame_idx, viewpoint): Initializes the system with the given frame and viewpoint.
+        tracking(cur_frame_idx, viewpoint): Performs tracking for the current frame and viewpoint.
+        is_keyframe(cur_frame_idx, last_keyframe_idx, cur_frame_visibility_filter, occ_aware_visibility): Determines if the current frame should be a keyframe.
+        add_to_window(cur_frame_idx, cur_frame_visibility_filter, occ_aware_visibility, window): Adds the current frame to the sliding window.
+        request_keyframe(cur_frame_idx, viewpoint, current_window, depthmap): Requests a new keyframe.
+        reqeust_mapping(cur_frame_idx, viewpoint): Requests mapping for the current frame.
+        request_init(cur_frame_idx, viewpoint, depth_map): Requests initialization with the given frame, viewpoint, and depth map.
+        sync_backend(data): Synchronizes the backend with the given data.
+        cleanup(cur_frame_idx): Cleans up resources for the current frame.
+        run(): Main loop for the front-end process.
+    """
+
     def __init__(self, config):
         super().__init__()
         self.config = config

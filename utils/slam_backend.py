@@ -3,7 +3,6 @@ import random
 import time
 
 import numpy as np
-
 import torch
 import torch.multiprocessing as mp
 from tqdm import tqdm
@@ -30,6 +29,42 @@ class frontend_sync_msg:
 
 
 class BackEnd(mp.Process):
+    """
+    BackEnd class for SLAM (Simultaneous Localization and Mapping) backend processing.
+
+    Attributes:
+        config (dict): Configuration dictionary.
+        gaussians (object): Gaussian object for managing point clouds.
+        pipeline_params (object): Parameters for the processing pipeline.
+        opt_params (object): Optimization parameters.
+        background (object): Background object.
+        cameras_extent (object): Extent of the cameras.
+        frontend_queue (Queue): Queue for communication with the frontend.
+        backend_queue (Queue): Queue for communication with the backend.
+        live_mode (bool): Flag for live mode.
+        pause (bool): Flag for pausing the backend processing.
+        device (str): Device to be used for processing (e.g., "cuda").
+        dtype (torch.dtype): Data type for tensors.
+        monocular (bool): Flag for monocular mode.
+        iteration_count (int): Counter for iterations.
+        last_sent (int): Counter for the last sent data.
+        occ_aware_visibility (dict): Dictionary for occlusion-aware visibility.
+        viewpoints (dict): Dictionary for viewpoints.
+        current_window (list): List of current window keyframes.
+        initialized (bool): Flag for initialization status.
+        keyframe_optimizers (torch.optim.Optimizer): Optimizer for keyframes.
+
+    Methods:
+        set_hyperparams(): Sets the hyperparameters from the configuration.
+        add_next_kf(frame_idx, viewpoint, init=False, scale=2.0, depth_map=None): Adds the next keyframe.
+        reset(): Resets the backend state.
+        initialize_map(cur_frame_idx, viewpoint): Initializes the map with the given frame index and viewpoint.
+        map(current_window, prune=False, iters=1): Performs mapping with the current window of keyframes.
+        color_refinement(): Refines the color of the map.
+        push_to_frontend(tag=None): Pushes the current state to the frontend.
+        run(): Main loop for the backend processing.
+    """
+
     def __init__(self, config):
         super().__init__()
         self.config = config
