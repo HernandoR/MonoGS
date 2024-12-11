@@ -23,7 +23,7 @@ from utils.slam_frontend import FrontEnd
 
 
 class SLAM:
-    def __init__(self, config, save_dir: str = None):
+    def __init__(self, config: dict, save_dir: str = None):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
 
@@ -31,9 +31,9 @@ class SLAM:
 
         self.config = config
         self.save_dir = save_dir
-        model_params = munchify(config["model_params"])
-        opt_params = munchify(config["opt_params"])
-        pipeline_params = munchify(config["pipeline_params"])
+        model_params: Munch = munchify(config["model_params"])
+        opt_params: Munch = munchify(config["opt_params"])
+        pipeline_params: Munch = munchify(config["pipeline_params"])
 
         self.model_params: Munch = model_params
         self.opt_param: Munch = opt_params

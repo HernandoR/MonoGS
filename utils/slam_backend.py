@@ -155,7 +155,7 @@ class BackEnd(mp.Process):
         Log("Initialized map")
         return render_pkg
 
-    def map(self, current_window, prune=False, iters=1):
+    def map(self, current_window: list, prune: bool = False, iters: int = 1):
         if len(current_window) == 0:
             return
 
@@ -185,8 +185,12 @@ class BackEnd(mp.Process):
                 viewpoint = viewpoint_stack[cam_idx]
                 keyframes_opt.append(viewpoint)
                 render_pkg = render(
-                    viewpoint, self.gaussians, self.pipeline_params, self.background
+                    viewpoint,
+                    self.gaussians,
+                    self.pipeline_params,
+                    self.background,
                 )
+
                 (
                     image,
                     viewspace_point_tensor,

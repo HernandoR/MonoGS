@@ -67,7 +67,9 @@ class FrontEnd(mp.Process):
         self.window_size = self.config["Training"]["window_size"]
         self.single_thread = self.config["Training"]["single_thread"]
 
-    def add_new_keyframe(self, cur_frame_idx, depth=None, opacity=None, init=False):
+    def add_new_keyframe(
+        self, cur_frame_idx, depth=None, opacity=None, init=False
+    ) -> np.ndarray:
         rgb_boundary_threshold = self.config["Training"]["rgb_boundary_threshold"]
         self.kf_indices.append(cur_frame_idx)
         viewpoint = self.cameras[cur_frame_idx]
