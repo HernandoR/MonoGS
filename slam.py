@@ -7,7 +7,7 @@ from datetime import datetime
 import torch
 import torch.multiprocessing as mp
 import yaml
-from munch import munchify
+from munch import Munch, munchify
 
 import wandb
 from gaussian_splatting.scene.gaussian_model import GaussianModel
@@ -23,7 +23,7 @@ from utils.slam_frontend import FrontEnd
 
 
 class SLAM:
-    def __init__(self, config, save_dir=None):
+    def __init__(self, config, save_dir: str = None):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
 
@@ -34,30 +34,34 @@ class SLAM:
         model_params = munchify(config["model_params"])
         opt_params = munchify(config["opt_params"])
         pipeline_params = munchify(config["pipeline_params"])
-        self.model_params, self.opt_params, self.pipeline_params = (
-            model_params,
-            opt_params,
-            pipeline_params,
-        )
 
-        self.live_mode = self.config["Dataset"]["type"] == "realsense"
-        self.monocular = self.config["Dataset"]["sensor_type"] == "monocular"
-        self.use_spherical_harmonics = self.config["Training"]["spherical_harmonics"]
-        self.use_gui = self.config["Results"]["use_gui"]
+        self.model_params: Munch = model_params
+        self.opt_param: Munch = opt_params
+        self.pipeline_params: Munch = pipeline_params
+
+        self.live_mode: bool = self.config["Dataset"]["type"] == "realsense"
+        self.monocular: bool = self.config["Dataset"]["sensor_type"] == "monocular"
+        self.use_spherical_harmonics: bool = self.config["Training"][
+            "spherical_harmonics"
+        ]
+        self.use_gui: bool = self.config["Results"]["use_gui"]
         if self.live_mode:
             self.use_gui = True
-        self.eval_rendering = self.config["Results"]["eval_rendering"]
+        self.eval_rendering: bool = self.config["Results"]["eval_rendering"]
 
         model_params.sh_degree = 3 if self.use_spherical_harmonics else 0
 
+        # Initialize the Gaussian Model
         self.gaussians = GaussianModel(model_params.sh_degree, config=self.config)
         self.gaussians.init_lr(6.0)
         self.dataset = load_dataset(
             model_params, model_params.source_path, config=config
         )
 
+        # Initialize the pipeline parameters
         self.gaussians.training_setup(opt_params)
         bg_color = [0, 0, 0]
+        # bg color
         self.background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
         frontend_queue = mp.Queue()
@@ -66,7 +70,7 @@ class SLAM:
         q_main2vis = mp.Queue() if self.use_gui else FakeQueue()
         q_vis2main = mp.Queue() if self.use_gui else FakeQueue()
 
-        self.config["Results"]["save_dir"] = save_dir
+        self.config["Results"]["save_dir"] = self.save_dir
         self.config["Training"]["monocular"] = self.monocular
 
         self.frontend = FrontEnd(self.config)
