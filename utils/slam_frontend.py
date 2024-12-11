@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import time
 
 import numpy as np
@@ -5,6 +6,7 @@ import torch
 import torch.multiprocessing as mp
 
 from gaussian_splatting.gaussian_renderer import render
+from gaussian_splatting.scene.gaussian_model import GaussianModel
 from gaussian_splatting.utils.graphics_utils import getProjectionMatrix2, getWorld2View2
 from gui import gui_utils
 from utils.camera_utils import Camera
@@ -13,6 +15,17 @@ from utils.logging_utils import Log
 from utils.multiprocessing_utils import clone_obj
 from utils.pose_utils import update_pose
 from utils.slam_utils import get_loss_tracking, get_median_depth
+
+
+@dataclass
+class backend_sync_msg:
+    tag: str
+    gaussians: GaussianModel
+    occ_aware_visibility: dict
+    keyframes: list
+
+    def __getitem__(self, index):
+        return self.__dict__.values()[index]
 
 
 class FrontEnd(mp.Process):
@@ -299,7 +312,7 @@ class FrontEnd(mp.Process):
         self.backend_queue.put(msg)
         self.requested_init = True
 
-    def sync_backend(self, data):
+    def sync_backend(self, data: backend_sync_msg):
         self.gaussians = data[1]
         occ_aware_visibility = data[2]
         keyframes = data[3]
@@ -479,7 +492,7 @@ class FrontEnd(mp.Process):
                     duration = tic.elapsed_time(toc)
                     time.sleep(max(0.01, 1.0 / 3.0 - duration / 1000))
             else:
-                data = self.frontend_queue.get()
+                data: backend_sync_msg = self.frontend_queue.get()
                 if data[0] == "sync_backend":
                     self.sync_backend(data)
 

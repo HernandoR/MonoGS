@@ -1,5 +1,8 @@
+from dataclasses import dataclass
 import random
 import time
+
+import numpy as np
 
 import torch
 import torch.multiprocessing as mp
@@ -7,10 +10,23 @@ from tqdm import tqdm
 
 from gaussian_splatting.gaussian_renderer import render
 from gaussian_splatting.utils.loss_utils import l1_loss, ssim
+from utils.camera_utils import Camera
 from utils.logging_utils import Log
 from utils.multiprocessing_utils import clone_obj
 from utils.pose_utils import update_pose
 from utils.slam_utils import get_loss_mapping
+
+
+@dataclass
+class frontend_sync_msg:
+    tag: str
+    cur_frame_idx: int
+    viewpoint: Camera
+    current_window: list
+    depthmap: np.ndarray
+
+    def __getitem__(self, index):
+        return self.__dict__.values()[index]
 
 
 class BackEnd(mp.Process):
@@ -382,7 +398,7 @@ class BackEnd(mp.Process):
                     self.map(self.current_window, prune=True, iters=10)
                     self.push_to_frontend()
             else:
-                data = self.backend_queue.get()
+                data: frontend_sync_msg = self.backend_queue.get()
                 if data[0] == "stop":
                     break
                 elif data[0] == "pause":
