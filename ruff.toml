@@ -1,0 +1,4 @@
+
+select = ["E", "F", "W", "C90"]
+ignore = ["E501", "C901", "F401", "F841"]
+exclude = ["tests/*", "docs/*"]
