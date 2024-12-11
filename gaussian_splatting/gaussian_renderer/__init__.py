@@ -33,12 +33,14 @@ def render(
     """
     Render the scene.
 
-    Background tensor (bg_color) must be on GPU!
+    Background tensor (bg_color) must be on GPU or other accelerator!
     """
 
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     if pc.get_xyz.shape[0] == 0:
         return None
+    if bg_color.device == "cpu":
+        raise ValueError("Background color tensor must be on GPU or other accelerator!")
 
     screenspace_points = (
         torch.zeros_like(
