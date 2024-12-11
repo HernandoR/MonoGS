@@ -7,8 +7,18 @@ import numpy as np
 import torch
 import trimesh
 from PIL import Image
+from pathlib import Path
 
 from gaussian_splatting.utils.graphics_utils import focal2fov
+import pytransform3d.trajectories as pytraj
+import pytransform3d.transformations as pytrans
+
+from accelerate.logging import get_logger
+from accelerate import Accelerator
+
+logger = get_logger(__name__)
+
+accelerator = Accelerator()
 
 try:
     import pyrealsense2 as rs
@@ -16,7 +26,43 @@ except Exception:
     pass
 
 
-class ReplicaParser:
+class BaseParser:
+    def __init__(self, input_folder):
+        self.input_folder = input_folder
+        self.color_paths = []
+        self.depth_paths = []
+        self.poses = []
+        self.frames = []
+        self.n_img = 0
+
+    def load_poses(self, path):
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def parse_list(self, filepath, skiprows=0):
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def associate_frames(self, tstamp_image, tstamp_depth, tstamp_pose, max_dt=0.08):
+        logger.debug("using default associate_frames")
+        associations = []
+        for i, t in enumerate(tstamp_image):
+            if tstamp_pose is None:
+                j = np.argmin(np.abs(tstamp_depth - t))
+                if np.abs(tstamp_depth[j] - t) < max_dt:
+                    associations.append((i, j))
+
+            else:
+                j = np.argmin(np.abs(tstamp_depth - t))
+                k = np.argmin(np.abs(tstamp_pose - t))
+
+                if (np.abs(tstamp_depth[j] - t) < max_dt) and (
+                    np.abs(tstamp_pose[k] - t) < max_dt
+                ):
+                    associations.append((i, j, k))
+
+        return associations
+
+
+class ReplicaParser(BaseParser):
     def __init__(self, input_folder):
         self.input_folder = input_folder
         self.color_paths = sorted(glob.glob(f"{self.input_folder}/results/frame*.jpg"))
@@ -45,7 +91,32 @@ class ReplicaParser:
         self.frames = frames
 
 
-class TUMParser:
+class TUMParser(BaseParser):
+    """
+    A parser class for handling TUM dataset.
+
+    Attributes:
+        input_folder (str): The folder containing the dataset.
+        n_img (int): The number of images in the dataset.
+        color_paths (list): List of paths to color images.
+        depth_paths (list): List of paths to depth images.
+        poses (list): List of pose matrices.
+        frames (list): List of frame dictionaries containing file paths and transformation matrices.
+
+    Methods:
+        __init__(input_folder):
+            Initializes the TUMParser with the given input folder and loads poses.
+
+        parse_list(filepath, skiprows=0):
+            Parses a list from a file with the given filepath and skiprows.
+
+        associate_frames(tstamp_image, tstamp_depth, tstamp_pose, max_dt=0.08):
+            Associates frames based on timestamps of images, depth, and poses.
+
+        load_poses(datapath, frame_rate=-1):
+            Loads poses from the dataset path and associates frames based on the given frame rate.
+    """
+
     def __init__(self, input_folder):
         self.input_folder = input_folder
         self.load_poses(self.input_folder, frame_rate=32)
@@ -56,6 +127,24 @@ class TUMParser:
         return data
 
     def associate_frames(self, tstamp_image, tstamp_depth, tstamp_pose, max_dt=0.08):
+        """
+        Associate frames based on their timestamps.
+
+        This function associates image frames with depth frames and optionally pose frames
+        based on their timestamps. The association is done by finding the closest timestamps
+        within a specified maximum time difference.
+
+        Parameters:
+        tstamp_image (list or np.array): Timestamps of the image frames.
+        tstamp_depth (list or np.array): Timestamps of the depth frames.
+        tstamp_pose (list or np.array or None): Timestamps of the pose frames. If None, only
+                                                image and depth frames are associated.
+        max_dt (float): Maximum allowed time difference for association. Default is 0.08 seconds.
+
+        Returns:
+        list: A list of tuples containing the indices of the associated frames. Each tuple contains
+              two indices (i, j) if tstamp_pose is None, or three indices (i, j, k) if tstamp_pose is provided.
+        """
         associations = []
         for i, t in enumerate(tstamp_image):
             if tstamp_pose is None:
@@ -122,7 +211,7 @@ class TUMParser:
             self.frames.append(frame)
 
 
-class EuRoCParser:
+class EuRoCParser(BaseParser):
     def __init__(self, input_folder, start_idx=0):
         self.input_folder = input_folder
         self.start_idx = start_idx
@@ -173,8 +262,7 @@ class EuRoCParser:
             trans = data[pose_indices[i], 1:4]
             quat = data[pose_indices[i], 4:8]
             quat = quat[[1, 2, 3, 0]]
-            
-            
+
             T_w_i = trimesh.transformations.quaternion_matrix(np.roll(quat, 1))
             T_w_i[:3, 3] = trans
             T_w_c = np.dot(T_w_i, T_i_c0)
@@ -279,6 +367,60 @@ class MonocularDataset(BaseDataset):
 
 
 class StereoDataset(BaseDataset):
+    """
+    A dataset class for handling stereo images and their corresponding calibration parameters.
+
+    Args:
+        args (Namespace): Arguments passed to the dataset.
+        path (str): Path to the dataset.
+        config (dict): Configuration dictionary containing calibration parameters.
+
+    Attributes:
+        width (int): Width of the images.
+        height (int): Height of the images.
+        fx_raw (float): Focal length in x direction for the raw left camera.
+        fy_raw (float): Focal length in y direction for the raw left camera.
+        cx_raw (float): Principal point x-coordinate for the raw left camera.
+        cy_raw (float): Principal point y-coordinate for the raw left camera.
+        fx (float): Focal length in x direction for the optimized left camera.
+        fy (float): Focal length in y direction for the optimized left camera.
+        cx (float): Principal point x-coordinate for the optimized left camera.
+        cy (float): Principal point y-coordinate for the optimized left camera.
+        fx_raw_r (float): Focal length in x direction for the raw right camera.
+        fy_raw_r (float): Focal length in y direction for the raw right camera.
+        cx_raw_r (float): Principal point x-coordinate for the raw right camera.
+        cy_raw_r (float): Principal point y-coordinate for the raw right camera.
+        fx_r (float): Focal length in x direction for the optimized right camera.
+        fy_r (float): Focal length in y direction for the optimized right camera.
+        cx_r (float): Principal point x-coordinate for the optimized right camera.
+        cy_r (float): Principal point y-coordinate for the optimized right camera.
+        fovx (float): Field of view in x direction.
+        fovy (float): Field of view in y direction.
+        K_raw (np.ndarray): Intrinsic matrix for the raw left camera.
+        K (np.ndarray): Intrinsic matrix for the optimized left camera.
+        Rmat (np.ndarray): Rotation matrix for the left camera.
+        K_raw_r (np.ndarray): Intrinsic matrix for the raw right camera.
+        K_r (np.ndarray): Intrinsic matrix for the optimized right camera.
+        Rmat_r (np.ndarray): Rotation matrix for the right camera.
+        disorted (bool): Flag indicating if the images are distorted.
+        dist_coeffs (np.ndarray): Distortion coefficients for the raw left camera.
+        map1x (np.ndarray): x-coordinates for undistortion and rectification of the left camera.
+        map1y (np.ndarray): y-coordinates for undistortion and rectification of the left camera.
+        dist_coeffs_r (np.ndarray): Distortion coefficients for the raw right camera.
+        map1x_r (np.ndarray): x-coordinates for undistortion and rectification of the right camera.
+        map1y_r (np.ndarray): y-coordinates for undistortion and rectification of the right camera.
+
+    Methods:
+        __getitem__(idx):
+            Retrieves the image, depth map, and pose for the given index.
+
+            Args:
+                idx (int): Index of the item to retrieve.
+
+            Returns:
+                tuple: A tuple containing the image (torch.Tensor), depth map (np.ndarray), and pose (torch.Tensor).
+    """
+
     def __init__(self, args, path, config):
         super().__init__(args, path, config)
         calibration = config["Dataset"]["Calibration"]
@@ -431,15 +573,17 @@ class RealsenseDataset(BaseDataset):
         super().__init__(args, path, config)
         self.pipeline = rs.pipeline()
         self.h, self.w = 720, 1280
-        
+
         self.depth_scale = 0
         if self.config["Dataset"]["sensor_type"] == "depth":
-            self.has_depth = True 
-        else: 
+            self.has_depth = True
+        else:
             self.has_depth = False
 
         self.rs_config = rs.config()
-        self.rs_config.enable_stream(rs.stream.color, self.w, self.h, rs.format.bgr8, 30)
+        self.rs_config.enable_stream(
+            rs.stream.color, self.w, self.h, rs.format.bgr8, 30
+        )
         if self.has_depth:
             self.rs_config.enable_stream(rs.stream.depth)
 
@@ -458,7 +602,7 @@ class RealsenseDataset(BaseDataset):
             self.profile.get_stream(rs.stream.color)
         )
         self.rgb_intrinsics = self.rgb_profile.get_intrinsics()
-        
+
         self.fx = self.rgb_intrinsics.fx
         self.fy = self.rgb_intrinsics.fy
         self.cx = self.rgb_intrinsics.ppx
@@ -479,14 +623,11 @@ class RealsenseDataset(BaseDataset):
 
         if self.has_depth:
             self.depth_sensor = self.profile.get_device().first_depth_sensor()
-            self.depth_scale  = self.depth_sensor.get_depth_scale()
+            self.depth_scale = self.depth_sensor.get_depth_scale()
             self.depth_profile = rs.video_stream_profile(
                 self.profile.get_stream(rs.stream.depth)
             )
             self.depth_intrinsics = self.depth_profile.get_intrinsics()
-        
-        
-
 
     def __getitem__(self, idx):
         pose = torch.eye(4, device=self.device, dtype=self.dtype)
@@ -498,7 +639,7 @@ class RealsenseDataset(BaseDataset):
             aligned_frames = self.align.process(frameset)
             rgb_frame = aligned_frames.get_color_frame()
             aligned_depth_frame = aligned_frames.get_depth_frame()
-            depth = np.array(aligned_depth_frame.get_data())*self.depth_scale
+            depth = np.array(aligned_depth_frame.get_data()) * self.depth_scale
             depth[depth < 0] = 0
             np.nan_to_num(depth, nan=1000)
         else:
