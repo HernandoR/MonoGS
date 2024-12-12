@@ -217,7 +217,7 @@ class FrontEnd(mp.Process):
 
         pose_optimizer = torch.optim.Adam(opt_params)
         for tracking_itr in range(self.tracking_itr_num):
-            render_pkg = render(
+            render_pkg: dict = render(
                 viewpoint, self.gaussians, self.pipeline_params, self.background
             )
             image, depth, opacity = (
