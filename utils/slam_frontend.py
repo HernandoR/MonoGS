@@ -370,6 +370,43 @@ class FrontEnd(mp.Process):
             torch.cuda.empty_cache()
 
     def run(self):
+        """
+        Main loop for the SLAM frontend.
+
+        This method handles the main loop for the SLAM frontend, including:
+        - Initializing the projection matrix.
+        - Handling pause and resume functionality.
+        - Processing frames from the dataset.
+        - Managing keyframes and tracking.
+        - Communicating with the backend and visualization queues.
+        - Saving results and evaluating ATE (Absolute Trajectory Error).
+
+        Attributes:
+            cur_frame_idx (int): Current frame index.
+            projection_matrix (torch.Tensor): Projection matrix for the camera.
+            tic (torch.cuda.Event): CUDA event for timing.
+            toc (torch.cuda.Event): CUDA event for timing.
+
+        Loop:
+            - Checks for pause/resume signals from the visualization queue.
+            - If paused, continues to the next iteration.
+            - If the frontend queue is empty, processes the current frame:
+                - Initializes the camera viewpoint from the dataset.
+                - Computes the gradient mask for the viewpoint.
+                - Tracks the current frame.
+                - Manages keyframes and updates the current window.
+                - Sends data to the visualization queue.
+                - Handles keyframe creation and cleanup.
+                - Saves results and evaluates ATE periodically.
+            - If the frontend queue is not empty, processes messages from the backend:
+                - Synchronizes with the backend.
+                - Handles keyframe requests.
+                - Handles initialization requests.
+                - Stops the frontend if a stop message is received.
+
+        Raises:
+            Exception: If any error occurs during the processing of frames or communication with the backend.
+        """
         cur_frame_idx = 0
         projection_matrix = getProjectionMatrix2(
             znear=0.01,
