@@ -386,17 +386,13 @@ class FrontEnd(mp.Process):
         toc = torch.cuda.Event(enable_timing=True)
 
         while True:
-            if self.q_vis2main.empty():
-                if self.pause:
-                    continue
-            else:
+            if not self.q_vis2main.empty():
                 data_vis2main = self.q_vis2main.get()
                 self.pause = data_vis2main.flag_pause
-                if self.pause:
-                    self.backend_queue.put(["pause"])
-                    continue
-                else:
-                    self.backend_queue.put(["unpause"])
+                self.backend_queue.put(["pause" if self.pause else "unpause"])
+
+            if self.pause:
+                continue
 
             if self.frontend_queue.empty():
                 tic.record()
